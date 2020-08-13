@@ -153,8 +153,8 @@ def add_label_to_eeg(sampled_eeg, event_type, position, duration):
 
 
 def assert_add_label_to_eeg(sampled_eeg, event_type, position, duration):
-    # Check that input sampled_EEG has shape (samples, 25)
-    assert sampled_eeg.shape[1] == 25, 'Input sampled_eeg is not of shape (samples, 25)'
+    # Check that input sampled_EEG has shape (samples, 22)
+#     assert sampled_eeg.shape[1] == 22, 'Input sampled_eeg is not of shape (samples, 22)'
     
      # Check correctness of event_type, position and duration
     assert len(event_type.shape) == 2 and event_type.shape[1] == 1, 'event_type of wrong input format'
@@ -259,37 +259,39 @@ def apply_pre_proc(eeg_sample, eeg_header=0, start_remove_index=22, end_remove_i
                 reject event (event = 1023), or
                 non-trial sample (e.g. in between start of new run to new trial)
     """
-    import sigproc
     import numpy as np
+    from pre_proc import sigproc  
+
+    
     eeg_sample = remove_columns(eeg_sample, start_remove_index, end_remove_index)  # Remove EOG channels
     eeg_sample = to_microvolt(eeg_sample)  # Convert from volt to microvolt
     eeg_sample = sigproc.bandpass_cnt(eeg_sample, 4, 38, 250)   # BPF from 4Hz to 38Hz, EEG Sampling Rate: 250Hz
     eeg_sample = sigproc.exponential_running_standardize(eeg_sample, factor_new=1e-3, init_block_size=None, eps=1e-6)   # Apply EMA on signal
     
-    if eeg_header == 0:   # No eeg_header. For testing of eeg_sample pre-processing
+    if eeg_header is 0:   # No eeg_header. For testing of eeg_sample pre-processing
         last_col = np.zeros((eeg_sample.shape[0], 1))
-        processed_eeg = np.hstack((eeg_sample, last_col))
+        processed_eeg_w_label = np.hstack((eeg_sample, last_col))
         val_trial = np.zeros((eeg_sample.shape[0],1))
         
     else:    # The main program to add label
         event_type = get_event_type(eeg_header)
         position = get_position(eeg_header)
         duration = get_duration(eeg_header)
-        processed_eeg, val_trial = add_label_to_eeg(sampled_eeg, event_type, position, duration)
+        processed_eeg_w_label, val_trial = add_label_to_eeg(eeg_sample, event_type, position, duration)
         
-    return processed_eeg, val_trial
+    return processed_eeg_w_label, val_trial
 
 
 
 
 
-def split_dataset(eeg_w_label, val_trial, start_pos, duration):
+def split_dataset(processed_eeg_w_label, val_trial, start_pos, duration):
     """
-    Function splits the eeg_w_label dataset to the respective training / test samples, 
+    Function splits the processed_eeg_w_label dataset to the respective training / test samples, 
     using val_trial as reference on the trial start / stop. start_pos and duration to determine trimming the dataset if provided.
     
     Argument:
-        eeg_w_label: numpy.ndarray with shape (samples, 26), where last column is the label
+        processed_eeg_w_label: numpy.ndarray with shape (samples, 26), where last column is the label
         val_trial: numpy.ndarray with shape (samples, 1), denoting 1 for samples collected during valid trial, 0 otherwise
         start_pos: integer to denote offset from each val_trial to start breaking data up
         duration: integer to denote the length (duration) of each valid trial to use.

@@ -447,5 +447,369 @@ class Test_apply_pre_proc(unittest.TestCase):
         
         
         
+# split_dataset        
+class Test_split_dataset(unittest.TestCase):
+    """ Test class for function preprocess.split_dataset """
+    """
+    1. test_no_val_trial: val_trial all 0s
+    2. test_one_val_trial: only 1 sample of valid trial
+    3. test_two_val_trial: 1 set of 2 samples + 1 set of 1 sample valid trial
+    4. test_start_1_val_trial: 1 set of 1 sample valid trial from start
+    5. test_start_valid_trial: 1 set of 2 samples valid trial from start
+    6. test_mul_valid_trial: 4 sets of valid trial with different length
+    7. test_0pos_0duration: 3 sets of valid trial with 0 start_pos, and 0 duration 
+    8. test_0pos_0duration_sgl: 3 sets of valid trial with 0 start_pos, and 0 duration. Sgl_label = True
+    9. test_2pos_4duration: 3 sets of valid trial with 2 start_pos, and 4 duration
+    10. test_2pos_1duration: 3 sets of valid trial with 2 start_pos, and 1 duration
+    """
+   
+    # Add your test methods for preprocess.to_microvolt here.
+    def test_no_val_trial(self):
+        """
+        1. test_no_val_trial:
+        """        
+        # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],\
+                                          [ 4, 5, 9],\
+                                          [ 7, 8, 9],\
+                                          [10,11,12]])
+        val_trial = np.zeros((4,1))
+        start_pos = 0
+        duration = 0
+        sgl_label = True
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([])
+        expected_Y = np.array([])
+        
+        # Check correct
+        np.testing.assert_array_equal(actual_X, expected_X)
+        np.testing.assert_array_equal(actual_Y, expected_Y)
+    
+    
+    
+    def test_one_val_trial(self):
+        """
+        2. test_one_val_trial: only 1 sample of valid trial
+        """        
+        # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],\
+                                          [ 4, 5, 9],\
+                                          [ 7, 8, 9],\
+                                          [10,11,12]])
+        val_trial = np.array([[0],[0],[1],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = True
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([[[7, 8]]])
+        expected_Y = np.array([[9]])
+        
+        # Check correct
+        np.testing.assert_array_equal(actual_X, expected_X)
+        np.testing.assert_array_equal(actual_Y, expected_Y)
+        
+        
+    def test_two_val_trial(self):
+        """
+        3. test_two_val_trial: 1 set of 2 samples + 1 set of 1 sample valid trial
+        """        
+        # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],\
+                                          [ 4, 5, 9],\
+                                          [ 7, 8,12],\
+                                          [10,11,12],\
+                                          [13,14,15],\
+                                          [16,17,18],\
+                                          [19,20,21]])
+        val_trial = np.array([[0],[0],[1],[1],[0],[1],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = True
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[7,8],[10,11]]),\
+                               np.array([[16,17]])])
+        expected_Y = np.array([[12],[18]])
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            
+        np.testing.assert_array_equal(actual_Y, expected_Y)        
+        
+        
+    def test_start_1_val_trial(self):
+        """
+        4. test_start_1_val_trial: 1 set of 1 sample valid trial from start
+        """        
+        # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],\
+                                          [ 4, 5, 9],\
+                                          [ 7, 8,12],\
+                                          [10,11,12],\
+                                          [13,14,15],\
+                                          [16,17,18],\
+                                          [19,20,21]])
+        val_trial = np.array([[1],[0],[0],[0],[0],[0],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = True
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[1,2]])])
+        expected_Y = np.array([[3]])
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            
+        np.testing.assert_array_equal(actual_Y, expected_Y)  
+        
+        
+  
+        
+    def test_start_valid_trial(self):
+        """
+        5. test_start_valid_trial: 1 set of 2 samples valid trial from start
+        Note: Shape of output Y is different for sgl_label = True Vs False
+        """        
+         # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],\
+                                          [ 4, 5, 9],\
+                                          [ 7, 8,12],\
+                                          [10,11,12],\
+                                          [13,14,15],\
+                                          [16,17,18],\
+                                          [19,20,21]])
+        val_trial = np.array([[1],[1],[0],[0],[0],[0],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = False
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[1,2],[4,5]])])
+        expected_Y = np.array([np.array([[3],[9]])])   
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            np.testing.assert_array_equal(actual_Y[i], expected_Y[i])  
+        
+    
+    
+    
+    def test_mul_valid_trial(self):
+        """
+        6. test_mul_valid_trial: 4 sets of valid trial with different length
+        """        
+         # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],\
+                                          [ 4, 5, 9],\
+                                          [ 7, 8,12],\
+                                          [10,11,12],\
+                                          [13,14,15],\
+                                          [16,17,18],\
+                                          [19,20,21],\
+                                          [22,23,24],\
+                                          [25,26,27],\
+                                          [28,29,30]])
+        val_trial = np.array([[1],[1],[0],[0],[1],\
+                              [0],[1],[0],[1],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = False
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[1,2],[4,5]]), \
+                               np.array([[13,14]]), \
+                               np.array([[19,20]]), \
+                               np.array([[25,26]])])
+        
+        expected_Y = np.array([np.array([[3],[9]]), \
+                               np.array([[15]]), \
+                               np.array([[21]]), \
+                               np.array([[27]])])   
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            np.testing.assert_array_equal(actual_Y[i], expected_Y[i])  
+        
+        
+    def test_0pos_0duration(self):
+        """
+        7. test_0pos_0duration: 3 sets of valid trial with 0 start_pos, and 0 duration 
+        """        
+         # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30]])
+        
+        val_trial = np.array([[0],[0],[1],[1],[1],\
+                              [1],[1],[1],[0],[0],\
+                              [0],[0],[0],[1],[1],\
+                              [1],[1],[1],[1],[0],\
+                              [0],[1],[1],[1],[1],\
+                              [1],[1],[0],[0],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = False
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[ 7, 8],[10,11],[13,14],[16,17],[19,20],[22,23]]),\
+                               np.array([[10,11],[13,14],[16,17],[19,20],[22,23],[25,26]]),\
+                               np.array([[ 4, 5],[ 7, 8],[10,11],[13,14],[16,17],[19,20]])])
+                               
+        expected_Y = np.array([np.array([[ 9],[12],[15],[18],[21],[24]]),\
+                               np.array([[12],[15],[18],[21],[24],[27]]),\
+                               np.array([[ 6],[ 9],[12],[15],[18],[21]])])
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            np.testing.assert_array_equal(actual_Y[i], expected_Y[i])  
+        
+    def test_0pos_0duration_sgl(self):
+        """
+        8. test_0pos_0duration_sgl: 3 sets of valid trial with 0 start_pos, and 0 duration. sgl_label = True
+        """        
+         # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,15],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,21],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,18],[22,23,24],[25,26,27],[28,29,30]])
+        
+        val_trial = np.array([[0],[0],[1],[1],[1],\
+                              [1],[1],[1],[0],[0],\
+                              [0],[0],[0],[1],[1],\
+                              [1],[1],[1],[1],[0],\
+                              [0],[1],[1],[1],[1],\
+                              [1],[1],[0],[0],[0]])
+        start_pos = 0
+        duration = 0
+        sgl_label = True
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[ 7, 8],[10,11],[13,14],[16,17],[19,20],[22,23]]),\
+                               np.array([[10,11],[13,14],[16,17],[19,20],[22,23],[25,26]]),\
+                               np.array([[ 4, 5],[ 7, 8],[10,11],[13,14],[16,17],[19,20]])])
+                               
+        expected_Y = np.array([[15], [21], [18]])
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            np.testing.assert_array_equal(actual_Y[i], expected_Y[i])  
+            
+    def test_2pos_4duration(self):
+        """
+        9. test_2pos_4duration: 3 sets of valid trial with 2 start_pos, and 4 duration
+        """        
+        # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30]])
+        
+        val_trial = np.array([[0],[0],[1],[1],[1],\
+                              [1],[1],[1],[0],[0],\
+                              [0],[0],[0],[1],[1],\
+                              [1],[1],[1],[1],[0],\
+                              [0],[1],[1],[1],[1],\
+                              [1],[1],[0],[0],[0]])
+        start_pos = 2
+        duration = 3
+        sgl_label = False
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[13,14],[16,17],[19,20]]),\
+                               np.array([[16,17],[19,20],[22,23]]),\
+                               np.array([[10,11],[13,14],[16,17]])])
+                               
+        expected_Y = np.array([np.array([[15],[18],[21]]),\
+                               np.array([[18],[21],[24]]),\
+                               np.array([[12],[15],[18]])])
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            np.testing.assert_array_equal(actual_Y[i], expected_Y[i])  
+            
+        
+    def test_2pos_1duration(self):
+        """
+        10. test_2pos_1duration: 3 sets of valid trial with 2 start_pos, and 1 duration
+        """        
+         # Initialize
+        processed_eeg_w_label = np.array([[ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,15],[13,14,15],\
+                                          [16,17,18],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,21],[19,20,21],[22,23,24],[25,26,27],[28,29,30],\
+                                          [ 1, 2, 3],[ 4, 5, 6],[ 7, 8, 9],[10,11,12],[13,14,15],\
+                                          [16,17,18],[19,20,18],[22,23,24],[25,26,27],[28,29,30]])
+        
+        val_trial = np.array([[0],[0],[1],[1],[1],\
+                              [1],[1],[1],[0],[0],\
+                              [0],[0],[0],[1],[1],\
+                              [1],[1],[1],[1],[0],\
+                              [0],[1],[1],[1],[1],\
+                              [1],[1],[0],[0],[0]])
+        start_pos = 3
+        duration = 1
+        sgl_label = True
+        
+        # Actual
+        actual_X, actual_Y = pre_process.split_dataset(processed_eeg_w_label, val_trial, start_pos, duration, sgl_label)
+        
+        # Expected
+        expected_X = np.array([np.array([[16,17]]),\
+                               np.array([[19,20]]),\
+                               np.array([[13,14]])])
+                               
+        expected_Y = np.array([[18], [21], [15]])
+        
+        # Check correct
+        for i in range(len(expected_X)):
+            np.testing.assert_array_equal(actual_X[i], expected_X[i])
+            np.testing.assert_array_equal(actual_Y[i], expected_Y[i])  
+        
+        
+        
 if __name__ == '__main__':
     unittest.main(exit=False)

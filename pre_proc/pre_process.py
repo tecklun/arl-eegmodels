@@ -261,12 +261,14 @@ def apply_pre_proc(eeg_sample, eeg_header=0, start_remove_index=22, end_remove_i
     """
     import numpy as np
     from pre_proc import sigproc  
+    from IPython.core.debugger import set_trace
 
     
     eeg_sample = remove_columns(eeg_sample, start_remove_index, end_remove_index)  # Remove EOG channels
     eeg_sample = to_microvolt(eeg_sample)  # Convert from volt to microvolt
     eeg_sample = sigproc.bandpass_cnt(eeg_sample, 4, 38, 250)   # BPF from 4Hz to 38Hz, EEG Sampling Rate: 250Hz
     eeg_sample = sigproc.exponential_running_standardize(eeg_sample, factor_new=1e-3, init_block_size=None, eps=1e-6)   # Apply EMA on signal
+    set_trace()
     
     if eeg_header is 0:   # No eeg_header. For testing of eeg_sample pre-processing
         last_col = np.zeros((eeg_sample.shape[0], 1))
@@ -285,15 +287,95 @@ def apply_pre_proc(eeg_sample, eeg_header=0, start_remove_index=22, end_remove_i
 
 
 
-def split_dataset(processed_eeg_w_label, val_trial, start_pos, duration):
+def split_dataset(processed_eeg_w_label, val_trial, start_pos=int((2+0.5)*250), duration=int(2*250), sgl_label=True):
     """
-    Function splits the processed_eeg_w_label dataset to the respective training / test samples, 
+    Function splits the processed_eeg_w_label dataset to retain only the trial samples (i.e. val_trial == 1), 
     using val_trial as reference on the trial start / stop. start_pos and duration to determine trimming the dataset if provided.
     
     Argument:
-        processed_eeg_w_label: numpy.ndarray with shape (samples, 26), where last column is the label
+        processed_eeg_w_label: numpy.ndarray with shape (samples, 23), where last column is the label
         val_trial: numpy.ndarray with shape (samples, 1), denoting 1 for samples collected during valid trial, 0 otherwise
-        start_pos: integer to denote offset from each val_trial to start breaking data up
-        duration: integer to denote the length (duration) of each valid trial to use.
+        start_pos: integer to denote offset from each val_trial to start breaking data up. Default to 2.5x250 = 625. If 0, ignore this field
+        duration: integer to denote the length (duration) of each valid trial to use. If 0, ignore this field
+            Cue onset at 2s from trial start
+            Epoch data at 0.5s to 2.5s from cue onset
+            Thus, start_pos at 2.5s x 250 (Hz), duration at 2s x 250Hz
+        sgl_label: boolean to decide on format of output Y. 
+            If True (default): output Y with shape (trials, 1) for classification
+            If False: output Y with shape (trials, samples_trial, 1) for sequence training
+            
+    Return:
+        X: numpy.ndarray with shape (trials, samples_trial, channels=22), where all channels are EEG data. No label
+        Y: numpy.ndarray with shape (trials, 1) if sgl_label=True, else shape (trials, samples_trial, 1). Output label 
     """
-    pass
+    import numpy as np
+    
+    # Check correctness of input
+    assert_split_dataset(processed_eeg_w_label, val_trial, start_pos, duration)
+    
+    # Find location and split location from valid trial
+    val_trial.astype(np.int64)   # Convert all val_trial from float to integer
+    
+    ones = np.where(val_trial[:,0]==1)
+    index_ones = np.array(ones)[0]
+    index_ones_dly = np.array(ones)[:,1:][0]   # Get 1 delayed version of index_ones
+    index_ones = index_ones[:-1]               # Trim index_ones to be same length as index_one_dly
+    indexes_1 = index_ones_dly-index_ones      # indexes_1 if =
+                                               #    1 -> Not reach end of valid sample
+                                               #  > 1 -> Reached end of last valid sample. Is now a new valid sample, thus split
+    split_list = np.array(np.where(indexes_1 != 1))[0] # Provides list of location to split the dataset 
+    
+    split_dataset = np.array(np.split(processed_eeg_w_label[(val_trial==1)[:,0]], split_list+1))   # raw split_dataset
+    
+    # Get data
+    X, Y = [], [] 
+    if len(split_dataset.flatten()) >= 1:  # If exist valid split_dataset
+        for i in range(len(split_dataset)):
+            assert split_dataset[i].shape[0] >= start_pos+duration, 'start_pos + duration is longer then length of split dataset'
+
+            # X Value
+            if start_pos == 0 and duration == 0:
+                X.append(split_dataset[i][:,:-1])
+            else: 
+                X.append(split_dataset[i][start_pos:start_pos+duration,:-1])
+
+            # Y Value
+            if start_pos == 0 and duration == 0:
+                y_labels = split_dataset[i][:,-1]
+            else: 
+                y_labels = split_dataset[i][start_pos:start_pos+duration,-1]
+                
+            if sgl_label:  # Single Label
+#                 print(split_dataset[i][:,-1])
+#                 print(split_dataset[i][:,-1].astype(np.int64))
+#                 print(np.apply_along_axis(np.bincount, 0, split_dataset[i][:,-1].astype(np.int64)).argmax())
+                y_value = np.array([np.apply_along_axis(np.bincount, 0, y_labels.astype(np.int64)).argmax()])
+                Y.append(y_value)
+            else:          # Label per sample
+                y_value = np.array(y_labels).astype(np.int64)
+                Y.append(np.expand_dims(y_value, axis=1))
+   
+    # Output
+    return np.array(X), np.array(Y)
+
+
+def assert_split_dataset(processed_eeg_w_label, val_trial, start_pos=(2+0.5)*250, duration=2*250):
+    
+    import numpy as np
+    
+    # Check dtype and dimensions of input
+    assert type(processed_eeg_w_label) == np.ndarray, 'processed_eeg_w_label must be of type np.ndarray'
+    assert type(val_trial) == np.ndarray, 'val_trial must be of type np.ndarray'
+    
+    assert len(processed_eeg_w_label.shape) == 2, 'processed_eeg_w_label must be of shape (samples, channel+label)'
+    assert (len(val_trial.shape) == 2 ) and (val_trial.shape[1] == 1), 'val_trial must be of shape (samples, 1)'
+    assert(processed_eeg_w_label.shape[0] == val_trial.shape[0]), '.shape[0] of processed_eeg_w_label and val_trial must be equal'
+    
+    assert (type(start_pos) == int) and (type(duration) == int), 'start_pos and duration must be of type int'
+    
+    # Check value of start_pos + duration < samples
+    assert (start_pos + duration) < val_trial.shape[0], 'start_pos + duration exceeds number of samples in input'
+    
+    # Check val_trial has only 0s and 1s and end with zeros
+    assert (min(val_trial) >= 0) and (max(val_trial) <= 1), 'val_trial must only contain 0s and 1s'
+    assert (val_trial[-1,0] == 0), 'val_trial must end with zeros'

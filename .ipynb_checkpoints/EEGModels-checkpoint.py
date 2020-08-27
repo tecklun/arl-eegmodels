@@ -128,6 +128,7 @@ def EEGNet(nb_classes, Chans = 64, Samples = 128,
                          'or Dropout, passed as a string.')
     
     input1   = Input(shape = (1, Chans, Samples))
+#     input1   = Input(shape = (273, Chans, Samples))   # By GTL changed to 273 batches according to A01T.s
 
     ##################################################################
     block1       = Conv2D(F1, (1, kernLength), padding = 'same',
@@ -158,6 +159,7 @@ def EEGNet(nb_classes, Chans = 64, Samples = 128,
     dense        = Dense(nb_classes, name = 'dense', 
                          kernel_constraint = max_norm(norm_rate))(flatten)
     softmax      = Activation('softmax', name = 'softmax')(dense)
+    print(softmax.shape)
     
     return Model(inputs=input1, outputs=softmax)
 

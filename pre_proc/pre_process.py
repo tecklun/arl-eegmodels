@@ -130,7 +130,7 @@ def add_label_to_eeg(sampled_eeg, event_type, position, duration):
             last_col[position[i,0]:position[i,0]+duration[i,0]] = 2
         
         elif event_type[i,0] == 771 :   # Class 3: Foot
-            last_col[position[i,0]:position[i,0]+duration[i,0]] = 3
+            last_col[position[i,0]:position-[i,0]+duration[i,0]] = 3
             
         elif event_type[i,0] == 772 :   # Class 4: Tongue
             last_col[position[i,0]:position[i,0]+duration[i,0]] = 4
@@ -246,7 +246,7 @@ def apply_pre_proc(eeg_sample, eeg_header=0, start_remove_index=22, end_remove_i
     4. add label to eeg_sample: apply add_label_to_eeg with event type, position and duration to generate label for eeg_sample
     
     Argument:
-        sampled_eeg: subject session header file => numpy.ndarray (e.g. file['A01T_s']) with shape (samples, 25)
+        eeg_sample: subject session header file => numpy.ndarray (e.g. file['A01T_s']) with shape (samples, 25)
         eeg_header: subject session header file => numpy.ndarray object (e.g. file['A01T_HDR'])
         start_remove_index: index of first EOG channel that needs to be removed. Default=22
         end_remove_index: index of last EOG channel that needs to be removed. Default=24
@@ -261,14 +261,11 @@ def apply_pre_proc(eeg_sample, eeg_header=0, start_remove_index=22, end_remove_i
     """
     import numpy as np
     from pre_proc import sigproc  
-    from IPython.core.debugger import set_trace
-
     
     eeg_sample = remove_columns(eeg_sample, start_remove_index, end_remove_index)  # Remove EOG channels
     eeg_sample = to_microvolt(eeg_sample)  # Convert from volt to microvolt
-    eeg_sample = sigproc.bandpass_cnt(eeg_sample, 4, 38, 250)   # BPF from 4Hz to 38Hz, EEG Sampling Rate: 250Hz
+#     eeg_sample = sigproc.bandpass_cnt(eeg_sample, 4., 38., 250.)   # BPF from 4Hz to 38Hz, EEG Sampling Rate: 250Hz
     eeg_sample = sigproc.exponential_running_standardize(eeg_sample, factor_new=1e-3, init_block_size=None, eps=1e-6)   # Apply EMA on signal
-    set_trace()
     
     if eeg_header is 0:   # No eeg_header. For testing of eeg_sample pre-processing
         last_col = np.zeros((eeg_sample.shape[0], 1))
@@ -287,7 +284,7 @@ def apply_pre_proc(eeg_sample, eeg_header=0, start_remove_index=22, end_remove_i
 
 
 
-def split_dataset(processed_eeg_w_label, val_trial, start_pos=int((2+0.5)*250), duration=int(2*250), sgl_label=True):
+def split_dataset(processed_eeg_w_label, val_trial, start_pos=int((2)*250), duration=int(2*250), sgl_label=True):
     """
     Function splits the processed_eeg_w_label dataset to retain only the trial samples (i.e. val_trial == 1), 
     using val_trial as reference on the trial start / stop. start_pos and duration to determine trimming the dataset if provided.
@@ -309,12 +306,12 @@ def split_dataset(processed_eeg_w_label, val_trial, start_pos=int((2+0.5)*250), 
         Y: numpy.ndarray with shape (trials, 1) if sgl_label=True, else shape (trials, samples_trial, 1). Output label 
     """
     import numpy as np
-    
+
     # Check correctness of input
     assert_split_dataset(processed_eeg_w_label, val_trial, start_pos, duration)
     
     # Find location and split location from valid trial
-    val_trial.astype(np.int64)   # Convert all val_trial from float to integer
+    val_trial = val_trial.astype(np.int64)   # Convert all val_trial from float to integer
     
     ones = np.where(val_trial[:,0]==1)
     index_ones = np.array(ones)[0]
@@ -325,31 +322,30 @@ def split_dataset(processed_eeg_w_label, val_trial, start_pos=int((2+0.5)*250), 
                                                #  > 1 -> Reached end of last valid sample. Is now a new valid sample, thus split
     split_list = np.array(np.where(indexes_1 != 1))[0] # Provides list of location to split the dataset 
     
-    split_dataset = np.array(np.split(processed_eeg_w_label[(val_trial==1)[:,0]], split_list+1))   # raw split_dataset
+    
+    splited_dataset = np.array(np.split(processed_eeg_w_label[(val_trial==1)[:,0]], split_list+1))   # raw splited_dataset
     
     # Get data
     X, Y = [], [] 
-    if len(split_dataset.flatten()) >= 1:  # If exist valid split_dataset
-        for i in range(len(split_dataset)):
-            assert split_dataset[i].shape[0] >= start_pos+duration, 'start_pos + duration is longer then length of split dataset'
+    if len(splited_dataset.flatten()) >= 1:  # If exist valid splited_dataset
+        for i in range(len(splited_dataset)):
+            assert splited_dataset[i].shape[0] >= start_pos+duration, 'start_pos + duration is longer then length of split dataset'
 
             # X Value
             if start_pos == 0 and duration == 0:
-                X.append(split_dataset[i][:,:-1])
+                X.append(splited_dataset[i][:,:-1])
             else: 
-                X.append(split_dataset[i][start_pos:start_pos+duration,:-1])
+                X.append(splited_dataset[i][start_pos:start_pos+duration,:-1])
 
             # Y Value
             if start_pos == 0 and duration == 0:
-                y_labels = split_dataset[i][:,-1]
+                y_labels = splited_dataset[i][:,-1]
             else: 
-                y_labels = split_dataset[i][start_pos:start_pos+duration,-1]
+                y_labels = splited_dataset[i][start_pos:start_pos+duration,-1]
                 
             if sgl_label:  # Single Label
-#                 print(split_dataset[i][:,-1])
-#                 print(split_dataset[i][:,-1].astype(np.int64))
-#                 print(np.apply_along_axis(np.bincount, 0, split_dataset[i][:,-1].astype(np.int64)).argmax())
-                y_value = np.array([np.apply_along_axis(np.bincount, 0, y_labels.astype(np.int64)).argmax()])
+                y_value = np.array([np.apply_along_axis(np.bincount, 0, y_labels.astype(np.int64)).argmax()]) 
+                
                 Y.append(y_value)
             else:          # Label per sample
                 y_value = np.array(y_labels).astype(np.int64)

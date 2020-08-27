@@ -170,6 +170,7 @@ def bandpass_cnt(
     bandpassed_data: 2d-array
         Data after applying bandpass filter.
     """
+    
     if (low_cut_hz == 0 or low_cut_hz is None) and (
         high_cut_hz == None or high_cut_hz == fs / 2.0
     ):
@@ -194,7 +195,7 @@ def bandpass_cnt(
     nyq_freq = 0.5 * fs
     low = low_cut_hz / nyq_freq
     high = high_cut_hz / nyq_freq
-    b, a = scipy.signal.butter(filt_order, [low, high], btype="bandpass")
+    b, a = scipy.signal.butter(filt_order, [low, high], btype="bandpass", output="ba")
     assert filter_is_stable(a), "Filter should be stable..."
     if filtfilt:
         data_bandpassed = scipy.signal.filtfilt(b, a, data, axis=axis)
